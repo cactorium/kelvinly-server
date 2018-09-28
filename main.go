@@ -2,15 +2,27 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"syscall"
 
+	"github.com/sevlyar/go-daemon"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
+)
+
+var (
+	signal = flag.String("s", "", `send signal to the daemon
+		quit — graceful shutdown
+		stop — fast shutdown
+		reload — reloading the configuration file`)
 )
 
 const HTML_HEADER = `<!doctype html5>
@@ -71,11 +83,86 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var (
+	shutdown       chan struct{} = make(chan struct{})
+	serverShutdown chan struct{} = make(chan struct{})
+)
+
 func main() {
+	flag.Parse()
+	daemon.AddCommand(daemon.StringFlag(signal, "quit"), syscall.SIGQUIT, termHandler)
+	daemon.AddCommand(daemon.StringFlag(signal, "stop"), syscall.SIGTERM, termHandler)
+	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
+
+	cntxt := &daemon.Context{
+		PidFileName: "/tmp/kelvinly-server-pid",
+		PidFilePerm: 0644,
+		LogFileName: "/tmp/kelvinly-server-log",
+		LogFilePerm: 0640,
+		WorkDir:     "./",
+		Umask:       027,
+	}
+	// TODO: figure out the daemonizing stuff
+
+	if len(daemon.ActiveFlags()) > 0 {
+		d, err := cntxt.Search()
+		if err != nil {
+			log.Fatalln("Unable to send signal to daemon:", err)
+		}
+		daemon.SendCommands(d)
+		return
+	}
+
+	d, err := cntxt.Reborn()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if d != nil {
+		return
+	}
+	defer cntxt.Release()
+
+	var srv http.Server
+
+	go startServer(&srv)
+
+	go func() {
+		<-shutdown
+		log.Println("shutting down server...")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			log.Printf("server shutdown error: %v\n", err)
+		}
+	}()
+
+	err = daemon.ServeSignals()
+	if err != nil {
+		log.Println("Error: ", err)
+	}
+
+	log.Println("server terminated")
+}
+
+func termHandler(sig os.Signal) error {
+	log.Printf("sending shutdown signal...")
+	close(shutdown)
+	return daemon.ErrStop
+}
+
+func reloadHandler(sig os.Signal) error {
+	log.Printf("[WARN] reloading not supported yet")
+	return nil
+}
+
+func startServer(srv *http.Server) {
 	log.Print("installing handlers")
-	http.HandleFunc("/", rootHandler)
-	http.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
-	http.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
+	serveMux := http.NewServeMux()
+	serveMux.HandleFunc("/", rootHandler)
+	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
+	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
+
+	srv.Addr = ":8000"
+	srv.Handler = serveMux
 	log.Print("starting server")
-	log.Fatal(http.ListenAndServe(":80", nil))
+	log.Fatal(srv.ListenAndServe())
+	close(serverShutdown)
 }
