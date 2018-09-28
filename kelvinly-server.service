@@ -1,0 +1,13 @@
+[Unit]
+Description=My main HTTP server
+After=network.target syslog.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/kelvin/kelvinly-server/kelvinly-server
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target 
+
