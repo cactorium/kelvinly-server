@@ -11,6 +11,8 @@ echo "export PATH=$PATH:/usr/lib/go-1.10/bin" >> ~/.bashrc
 echo "export GOPATH=~/go" >> ~/.bashrc
 
 sudo cp rules.v4 /etc/iptables/rules.v4
+sudo service netfilter-persistent reload
+
 sudo cp kelvinly-server.service /etc/systemd/system
 
 source ~/.bashrc

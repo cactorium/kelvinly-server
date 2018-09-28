@@ -171,7 +171,7 @@ func startServer(srv *http.Server) {
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 
-	srv.Addr = ":8043"
+	srv.Addr = ":8443"
 	srv.Handler = serveMux
 	log.Print("starting server")
 	log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
