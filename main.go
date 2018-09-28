@@ -25,6 +25,8 @@ var (
 		reload — reloading the configuration file`)
 )
 
+const DOMAIN_NAME = "threefortiethofonehamster.com"
+
 const HTML_HEADER = `<!doctype html5>
 <html>
 <head>
@@ -125,8 +127,10 @@ func main() {
 	}
 	defer cntxt.Release()
 
+	var redirect http.Server
 	var srv http.Server
 
+	go startRedirectServer(&redirect)
 	go startServer(&srv)
 
 	go func() {
@@ -134,6 +138,9 @@ func main() {
 		log.Println("shutting down server...")
 		if err := srv.Shutdown(context.Background()); err != nil {
 			log.Printf("server shutdown error: %v\n", err)
+		}
+		if err = redirect.Shutdown(context.Background()); err != nil {
+			log.Printf("redirect shutdown error: %v\n", err)
 		}
 	}()
 
@@ -164,7 +171,26 @@ func startServer(srv *http.Server) {
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 
-	srv.Addr = ":8000"
+	srv.Addr = ":8043"
+	srv.Handler = serveMux
+	log.Print("starting server")
+	log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
+		"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
+	close(serverShutdown)
+}
+
+func startRedirectServer(srv *http.Server) {
+	serveMux := http.NewServeMux()
+	// copied from https://gist.github.com/d-schmidt/587ceec34ce1334a5e60
+	serveMux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		target := "https://" + req.Host + req.URL.Path
+		if len(req.URL.RawQuery) > 0 {
+			target += "?" + req.URL.RawQuery
+		}
+		http.Redirect(w, req, target, http.StatusTemporaryRedirect)
+	})
+
+	srv.Addr = ":8080"
 	srv.Handler = serveMux
 	log.Print("starting server")
 	log.Fatal(srv.ListenAndServe())
