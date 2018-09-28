@@ -99,7 +99,7 @@ func main() {
 		PidFilePerm: 0644,
 		LogFileName: "/tmp/kelvinly-server-log",
 		LogFilePerm: 0640,
-		WorkDir:     "./",
+		WorkDir:     "/home/kelvin/kelvinly-server/",
 		Umask:       027,
 	}
 	// TODO: figure out the daemonizing stuff
