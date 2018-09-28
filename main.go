@@ -38,6 +38,9 @@ const HTML_HEADER = `<!doctype html5>
 `
 
 const HTML_FOOTER = `  </article>
+<footer>
+by Kelvin Ly, source available <a href="https://github.com/cactorium/kelvinly-server">here</a>
+</footer>
 </body>
 </html>`
 
@@ -157,6 +160,7 @@ func startServer(srv *http.Server) {
 	log.Print("installing handlers")
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/", rootHandler)
+	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 
