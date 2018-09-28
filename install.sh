@@ -7,10 +7,12 @@ sudo apt-get -y install iptables-persistent
 
 mkdir -p ~/go
 
-cat "export PATH=$PATH:/usr/lib/go-1.10/bin" >> ~/.bashrc
-cat "export GOPATH=~/go" >> ~/.bashrc
+echo "export PATH=$PATH:/usr/lib/go-1.10/bin" >> ~/.bashrc
+echo "export GOPATH=~/go" >> ~/.bashrc
+
+sudo cp rules.v4 /etc/iptables/rules.v4
 
 source ~/.bashrc
 go get -u gopkg.in/russross/blackfriday.v2
-go get -u https://github.com/shurcooL/github_flavored_markdown
+go get -u github.com/shurcooL/github_flavored_markdown
 go get -u github.com/sevlyar/go-daemon
