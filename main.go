@@ -36,12 +36,24 @@ const HTML_HEADER = `<!doctype html5>
 	<link href=/main.css media=all rel=stylesheet type=text/css></link>
 </head>
 <body>
+<nav>
+<div class="nav-wrapper">
+	<div class="nav-item">
+		<a href="/">Home</a>
+	</div>
+	<div class="nav-item">
+		<a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a>
+	</div>
+</div>
+</nav>
 <article class="markdown-body entry-content" style="padding:2em;">
 `
 
 const HTML_FOOTER = `  </article>
 <footer>
+<div class="footer-wrapper">
 by Kelvin Ly, source available <a href="https://github.com/cactorium/kelvinly-server">here</a>
+</div>
 </footer>
 </body>
 </html>`
@@ -105,7 +117,8 @@ func main() {
 		LogFileName: "/tmp/kelvinly-server-log",
 		LogFilePerm: 0640,
 		WorkDir:     "/home/kelvin/kelvinly-server/",
-		Umask:       027,
+		//WorkDir: ".",
+		Umask: 027,
 	}
 	// TODO: figure out the daemonizing stuff
 
@@ -169,6 +182,7 @@ func startServer(srv *http.Server) {
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
+	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 
 	srv.Addr = ":8443"
@@ -176,6 +190,9 @@ func startServer(srv *http.Server) {
 	log.Print("starting server")
 	log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
 		"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
+	/*
+		log.Fatal(srv.ListenAndServe())
+	*/
 	close(serverShutdown)
 }
 

@@ -1,3 +1,6 @@
 [submodule "static"]
 	path = static
 	url = https://github.com/cactorium/cactorium.github.io
+[submodule "resume"]
+	path = resume
+	url = https://github.com/cactorium/kelvin-ly-resume.git
