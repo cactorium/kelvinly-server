@@ -38,12 +38,10 @@ const HTML_HEADER = `<!doctype html5>
 <body>
 <nav>
 <div class="nav-wrapper">
-	<div class="nav-item">
-		<a href="/">Home</a>
-	</div>
-	<div class="nav-item">
-		<a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a>
-	</div>
+	<div class="nav-item"><a href="/">Home</a></div>
+	<div class="nav-item"><a href="/projects.md">Projects</a></div>
+	<div class="nav-item"><a href="/builds.md">Builds</a></div>
+	<div class="nav-item"><a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a></div>
 </div>
 </nav>
 <article class="markdown-body entry-content" style="padding:2em;">
@@ -58,32 +56,38 @@ by Kelvin Ly, source available <a href="https://github.com/cactorium/kelvinly-se
 </body>
 </html>`
 
-func serveMarkdown(w http.ResponseWriter, r *http.Request, path string) {
-	if b, err := ioutil.ReadFile(path); err != nil {
-		w.WriteHeader(404)
-		w.Write([]byte(fmt.Sprintf("file %s not found", path)))
-		return
-	} else {
-		w.Header().Add("Content-Type", "text/html; charset=utf-8")
-		title := ""
-		if s := bytes.Index(b, []byte("# ")); s != -1 {
-			t := b[s+2:]
-			if e := bytes.Index(t, []byte("\n")); e != -1 {
-				t = t[:e]
-				title = string(t)
-			}
+func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
+	bs := make([][]byte, 0, len(paths))
+	for _, path := range paths {
+		if b, err := ioutil.ReadFile(path); err != nil {
+			w.WriteHeader(404)
+			w.Write([]byte(fmt.Sprintf("file %s not found", path)))
+			return
+		} else {
+			bs = append(bs, b)
 		}
-		w.Write([]byte(fmt.Sprintf(HTML_HEADER, string(title), r.Host)))
+	}
+	w.Header().Add("Content-Type", "text/html; charset=utf-8")
+	title := ""
+	if s := bytes.Index(bs[0], []byte("# ")); s != -1 {
+		t := bs[0][s+2:]
+		if e := bytes.Index(t, []byte("\n")); e != -1 {
+			t = t[:e]
+			title = string(t)
+		}
+	}
+	w.Write([]byte(fmt.Sprintf(HTML_HEADER, string(title), r.Host)))
+	for _, b := range bs {
 		html := gfm.Markdown(b)
 		w.Write(html)
-		w.Write([]byte(HTML_FOOTER))
 	}
+	w.Write([]byte(HTML_FOOTER))
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		if r.URL.Path == "/" {
-			serveMarkdown(w, r, "static/README.md")
+			serveMarkdown(w, r, "static/intro.md", "static/projects.md", "static/builds.md")
 		} else if strings.HasSuffix(r.URL.Path, ".md") {
 			if strings.Contains(r.URL.Path, "..") {
 				w.WriteHeader(403)
@@ -116,9 +120,9 @@ func main() {
 		PidFilePerm: 0644,
 		LogFileName: "/tmp/kelvinly-server-log",
 		LogFilePerm: 0640,
-		WorkDir:     "/home/kelvin/kelvinly-server/",
-		//WorkDir: ".",
-		Umask: 027,
+		//WorkDir:     "/home/kelvin/kelvinly-server/",
+		WorkDir: ".",
+		Umask:   027,
 	}
 	// TODO: figure out the daemonizing stuff
 
@@ -188,11 +192,11 @@ func startServer(srv *http.Server) {
 	srv.Addr = ":8443"
 	srv.Handler = serveMux
 	log.Print("starting server")
-	log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
-		"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
 	/*
-		log.Fatal(srv.ListenAndServe())
+		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
+			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
 	*/
+	log.Fatal(srv.ListenAndServe())
 	close(serverShutdown)
 }
 
