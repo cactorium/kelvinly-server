@@ -29,6 +29,8 @@ var (
 		reload — reloading the configuration file`)
 )
 
+const DEBUG = false
+
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
 const HTML_HEADER = `<!doctype html5>
@@ -124,10 +126,13 @@ func main() {
 		PidFilePerm: 0644,
 		LogFileName: "/tmp/kelvinly-server-log",
 		LogFilePerm: 0640,
-		//WorkDir:     "/home/kelvin/kelvinly-server/",
-		WorkDir: ".",
-		Umask:   027,
+		WorkDir:     "/home/kelvin/kelvinly-server/",
+		Umask:       027,
 	}
+	if DEBUG {
+		cntxt.WorkDir = "."
+	}
+
 	// TODO: figure out the daemonizing stuff
 
 	if len(daemon.ActiveFlags()) > 0 {
@@ -263,11 +268,12 @@ func startServer(srv *http.Server) {
 	srv.Addr = ":8443"
 	srv.Handler = serveMux
 	log.Print("starting server")
-	/*
+	if !DEBUG {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
 			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
-	*/
-	log.Fatal(srv.ListenAndServe())
+	} else {
+		log.Fatal(srv.ListenAndServe())
+	}
 	close(serverShutdown)
 }
 
