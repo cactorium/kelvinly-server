@@ -258,7 +258,7 @@ func startServer(srv *http.Server) {
 			// TODO parse payload
 
 			pullCmd := exec.Command("git", "pull")
-			pullCmd.Path = "./static/"
+			pullCmd.Dir = "./static/"
 			_ = pullCmd.Run()
 
 			w.Write([]byte("success"))
