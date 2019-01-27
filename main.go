@@ -3,12 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 
@@ -180,14 +184,81 @@ func reloadHandler(sig os.Signal) error {
 	return nil
 }
 
+func readWebhookKey() []byte {
+	b, err := ioutil.ReadFile("webhook_secret")
+	if err != nil {
+		log.Printf("[ERR] webhook key not found, webhook updates will not work!")
+		return nil
+	}
+	ret := make([]byte, hex.DecodedLen(len(b)))
+	rl, err2 := hex.Decode(ret, b)
+	if err2 != nil {
+		return nil
+	}
+
+	return ret[:rl]
+}
+
 func startServer(srv *http.Server) {
 	log.Print("installing handlers")
+
+	webhookKey := readWebhookKey()
+
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
+	if webhookKey != nil {
+		serveMux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "POST" {
+				w.WriteHeader(403)
+				w.Write([]byte("invalid request type"))
+				return
+			}
+			signature := r.Header.Get("X-Hub-Signature")
+			if len(signature) == 0 {
+				w.WriteHeader(403)
+				w.Write([]byte("invalid request"))
+				return
+			}
+
+			payload, e := ioutil.ReadAll(r.Body)
+			if e != nil {
+				w.WriteHeader(403)
+				w.Write([]byte("unable to read body: " + e.Error()))
+				return
+			}
+
+			mac := hmac.New(sha1.New, webhookKey)
+			mac.Write(payload)
+			expected := mac.Sum(nil)
+
+			signatureDec := make([]byte, hex.DecodedLen(len(signature)))
+			sdl, e2 := hex.Decode(signatureDec, []byte(signature))
+			if e2 != nil {
+				w.WriteHeader(403)
+				w.Write([]byte("unable to read signature"))
+				return
+			}
+
+			signatureDec = signatureDec[:sdl]
+			if !hmac.Equal(expected, signatureDec) {
+				log.Print("webhook hmac match failed; expected %v found %v", expected, signature)
+				w.WriteHeader(403)
+				w.Write([]byte("invalid request"))
+				return
+			}
+			// TODO parse payload
+
+			pullCmd := exec.Command("git", "pull")
+			pullCmd.Path = "./static/"
+			_ = pullCmd.Run()
+
+			w.Write([]byte("success"))
+		})
+	}
 
 	srv.Addr = ":8443"
 	srv.Handler = serveMux
