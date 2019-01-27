@@ -195,13 +195,17 @@ func readWebhookKey() []byte {
 		log.Printf("[ERR] webhook key not found, webhook updates will not work!")
 		return nil
 	}
+	/*
 	ret := make([]byte, hex.DecodedLen(len(b)))
-	rl, err2 := hex.Decode(ret, b)
+	// skip the ending 0x0a
+	rl, err2 := hex.Decode(ret, b[:len(b)-1])
 	if err2 != nil {
+		log.Printf("[ERR] unable to decode webhook key! %v %s", b, err2)
 		return nil
 	}
+	*/
 
-	return ret[:rl]
+	return b[:len(b)-1]
 }
 
 func startServer(srv *http.Server) {
@@ -216,6 +220,7 @@ func startServer(srv *http.Server) {
 	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 	if webhookKey != nil {
+		log.Print("web hook found")
 		serveMux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "POST" {
 				w.WriteHeader(403)
@@ -241,7 +246,8 @@ func startServer(srv *http.Server) {
 			expected := mac.Sum(nil)
 
 			signatureDec := make([]byte, hex.DecodedLen(len(signature)))
-			sdl, e2 := hex.Decode(signatureDec, []byte(signature))
+			// skip the "sha1=" part
+			sdl, e2 := hex.Decode(signatureDec, []byte(signature)[5:])
 			if e2 != nil {
 				w.WriteHeader(403)
 				w.Write([]byte("unable to read signature"))
@@ -250,7 +256,7 @@ func startServer(srv *http.Server) {
 
 			signatureDec = signatureDec[:sdl]
 			if !hmac.Equal(expected, signatureDec) {
-				log.Print("webhook hmac match failed; expected %v found %v", expected, signature)
+				log.Print("webhook hmac match failed; expected %v found %v", expected, signatureDec)
 				w.WriteHeader(403)
 				w.Write([]byte("invalid request"))
 				return
