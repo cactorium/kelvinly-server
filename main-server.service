@@ -5,8 +5,8 @@ After=network.target syslog.target
 [Service]
 User=kelvin
 Type=forking
-PIDFile=/tmp/kelvinly-server-pid
-ExecStart=/home/kelvin/kelvinly-server/kelvinly-server
+PIDFile=/tmp/main-server-pid
+ExecStart=/home/kelvin/main-server/main-server
 StandardOutput=syslog
 StandardError=syslog
 

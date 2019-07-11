@@ -1,4 +1,4 @@
-kelvinly-server
+main-server
 *.pem
 webhook_secret
 

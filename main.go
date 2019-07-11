@@ -126,7 +126,7 @@ func main() {
 		PidFilePerm: 0644,
 		LogFileName: "/tmp/kelvinly-server-log",
 		LogFilePerm: 0640,
-		WorkDir:     "/home/kelvin/kelvinly-server/",
+		WorkDir:     "/home/kelvin/main-server/",
 		Umask:       027,
 	}
 	if DEBUG {

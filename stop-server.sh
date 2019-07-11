@@ -1,3 +1,3 @@
 #!/bin/bash
 
-kill `cat /tmp/kelvinly-server-pid`
+kill `cat /tmp/main-server-pid`
