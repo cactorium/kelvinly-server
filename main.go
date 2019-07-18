@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -16,11 +15,58 @@ import (
 	"strings"
 	"syscall"
 
+	"compress/gzip"
+	"io"
+	"io/ioutil"
+	"sync"
+
 	"github.com/sevlyar/go-daemon"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
 )
+
+// code copied from https://gist.github.com/CJEnright/bc2d8b8dc0c1389a9feeddb110f822d7
+
+var gzPool = sync.Pool{
+	New: func() interface{} {
+		w := gzip.NewWriter(ioutil.Discard)
+		return w
+	},
+}
+
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w *gzipResponseWriter) WriteHeader(status int) {
+	w.Header().Del("Content-Length")
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+func Gzip(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		w.Header().Set("Content-Encoding", "gzip")
+
+		gz := gzPool.Get().(*gzip.Writer)
+		defer gzPool.Put(gz)
+
+		gz.Reset(w)
+		defer gz.Close()
+
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
 
 var (
 	signal = flag.String("s", "", `send signal to the daemon
@@ -196,13 +242,13 @@ func readWebhookKey() []byte {
 		return nil
 	}
 	/*
-	ret := make([]byte, hex.DecodedLen(len(b)))
-	// skip the ending 0x0a
-	rl, err2 := hex.Decode(ret, b[:len(b)-1])
-	if err2 != nil {
-		log.Printf("[ERR] unable to decode webhook key! %v %s", b, err2)
-		return nil
-	}
+		ret := make([]byte, hex.DecodedLen(len(b)))
+		// skip the ending 0x0a
+		rl, err2 := hex.Decode(ret, b[:len(b)-1])
+		if err2 != nil {
+			log.Printf("[ERR] unable to decode webhook key! %v %s", b, err2)
+			return nil
+		}
 	*/
 
 	return b[:len(b)-1]
@@ -272,7 +318,7 @@ func startServer(srv *http.Server) {
 	}
 
 	srv.Addr = ":8443"
-	srv.Handler = serveMux
+	srv.Handler = Gzip(serveMux)
 	log.Print("starting server")
 	if !DEBUG {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
