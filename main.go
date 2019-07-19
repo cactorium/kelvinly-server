@@ -372,10 +372,11 @@ func startServer(srv *http.Server) {
 
 	if *devmode {
 		srv.Addr = ":8444"
+		srv.Handler = serveMux
 	} else {
 		srv.Addr = ":8443"
+		srv.Handler = Gzip(serveMux)
 	}
-	srv.Handler = Gzip(serveMux)
 	log.Print("starting server")
 	if !DEBUG {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
