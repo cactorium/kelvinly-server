@@ -209,7 +209,9 @@ func main() {
 	var redirect http.Server
 	var srv http.Server
 
-	go startRedirectServer(&redirect)
+	if !*devmode {
+		go startRedirectServer(&redirect)
+	}
 	go startServer(&srv)
 
 	go func() {
@@ -284,6 +286,7 @@ func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *htt
 
 		// create a new url from the raw RequestURI sent by the client
 		url := fmt.Sprintf("%s://%s%s", proxyScheme, proxyHost, req.RequestURI)
+		log.Print("request to " + req.RequestURI + " forwarded to " + url)
 
 		proxyReq, err := http.NewRequest(req.Method, url, bytes.NewReader(body))
 
@@ -294,7 +297,11 @@ func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *htt
 			proxyReq.Header[h] = val
 		}
 
-		resp, err := (&http.Client{Transport: &transportNoTlsVerify}).Do(proxyReq)
+		client := &http.Client{}
+		if proxyScheme == "https" {
+			client = &http.Client{Transport: &transportNoTlsVerify}
+		}
+		resp, err := client.Do(proxyReq)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -378,7 +385,7 @@ func startServer(srv *http.Server) {
 	}
 	srv.Handler = Gzip(serveMux)
 	log.Print("starting server")
-	if !DEBUG {
+	if !DEBUG && !*devmode {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
 			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
 	} else {
