@@ -308,7 +308,15 @@ func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *htt
 		}
 		defer resp.Body.Close()
 
-		// legacy code
+		respHeaders := w.Header()
+		for h, val := range resp.Header {
+			respHeaders[h] = val
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, err = io.Copy(w, resp.Body)
+		if err != nil {
+			log.Print("encountered error while forwarding copy : " + err.Error())
+		}
 	}
 }
 
