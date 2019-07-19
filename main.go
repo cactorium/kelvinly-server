@@ -319,7 +319,7 @@ func startServer(srv *http.Server) {
 
 	serveMux := http.NewServeMux()
 	if !*devmode {
-		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8444, "https"))
+		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
 	}
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
@@ -379,7 +379,7 @@ func startServer(srv *http.Server) {
 	}
 
 	if *devmode {
-		srv.Addr = ":8444"
+		srv.Addr = ":8081"
 		srv.Handler = serveMux
 	} else {
 		srv.Addr = ":8443"
