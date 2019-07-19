@@ -1,4 +1,6 @@
 main-server
 *.pem
 webhook_secret
+dev-server
+threefortiethofonehamster.com
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -268,6 +269,12 @@ func readWebhookKey() []byte {
 	return b[:len(b)-1]
 }
 
+var transportNoTlsVerify = http.Transport{
+	TLSClientConfig: &tls.Config{
+		InsecureSkipVerify: true,
+	},
+}
+
 // copied from https://stackoverflow.com/questions/34724160/go-http-send-incoming-http-request-to-an-other-server-using-client-do
 func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *http.Request) {
 	proxyHost := "0.0.0.0" + ":" + strconv.Itoa(port)
@@ -295,7 +302,7 @@ func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *htt
 			proxyReq.Header[h] = val
 		}
 
-		resp, err := (&http.Client{}).Do(proxyReq)
+		resp, err := (&http.Client{Transport: &transportNoTlsVerify}).Do(proxyReq)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return

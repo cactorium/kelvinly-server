@@ -1,3 +1,7 @@
 #!/bin/bash
 
-kill `cat /tmp/main-server-pid`
+SCRIPT=`realpath $0`
+SCRIPTPATH=`dirname $SCRIPT`
+BASENAME=`basename $SCRIPTPATH`
+echo $BASENAME
+kill `cat /tmp/$BASENAME-pid`
