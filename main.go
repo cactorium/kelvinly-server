@@ -80,6 +80,7 @@ var (
 
 const DEBUG = false
 
+const HOME_DIR = "/home/kelvin/"
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
 const HTML_HEADER = `<!doctype html5>
@@ -171,24 +172,14 @@ func main() {
 	daemon.AddCommand(daemon.StringFlag(signal, "stop"), syscall.SIGTERM, termHandler)
 	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
 
+	execName := os.Args[0]
 	cntxt := &daemon.Context{
-		PidFileName: "/tmp/main-server-pid",
+		PidFileName: "/tmp/" + execName + "-pid",
 		PidFilePerm: 0644,
-		LogFileName: "/tmp/main-server-log",
+		LogFileName: "/tmp/" + execName + "-log",
 		LogFilePerm: 0640,
-		WorkDir:     "/home/kelvin/main-server/",
+		WorkDir:     HOME_DIR + execName + "/",
 		Umask:       027,
-	}
-	if *devmode {
-		cntxt = &daemon.Context{
-			PidFileName: "/tmp/dev-server-pid",
-			PidFilePerm: 0644,
-			LogFileName: "/tmp/dev-server-log",
-			LogFilePerm: 0640,
-			WorkDir:     "/home/kelvin/dev-server/",
-			Umask:       027,
-		}
-
 	}
 	if DEBUG {
 		cntxt.WorkDir = "."
