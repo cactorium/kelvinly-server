@@ -178,6 +178,17 @@ func main() {
 		WorkDir:     "/home/kelvin/main-server/",
 		Umask:       027,
 	}
+	if *devmode {
+		cntxt = &daemon.Context{
+			PidFileName: "/tmp/dev-server-pid",
+			PidFilePerm: 0644,
+			LogFileName: "/tmp/dev-server-log",
+			LogFilePerm: 0640,
+			WorkDir:     "/home/kelvin/dev-server/",
+			Umask:       027,
+		}
+
+	}
 	if DEBUG {
 		cntxt.WorkDir = "."
 	}
