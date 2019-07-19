@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -172,7 +173,7 @@ func main() {
 	daemon.AddCommand(daemon.StringFlag(signal, "stop"), syscall.SIGTERM, termHandler)
 	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
 
-	execName := os.Args[0]
+	execName := path.Base(os.Args[0])
 	cntxt := &daemon.Context{
 		PidFileName: "/tmp/" + execName + "-pid",
 		PidFilePerm: 0644,
