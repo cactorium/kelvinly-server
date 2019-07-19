@@ -99,10 +99,11 @@ const HTML_HEADER = `<!doctype html5>
 <article class="markdown-body entry-content" style="padding:2em;">
 `
 
-const HTML_FOOTER = `  </article>
+const HTML_FOOTER = `
+</article>
 <footer>
 <div class="footer-wrapper">
-by Kelvin Ly, source available <a href="https://github.com/cactorium/kelvinly-server">here</a>
+by Kelvin Ly, source available <a href="https://github.com/cactorium/threefortiethofonehamster.com">here</a>
 </div>
 </footer>
 </body>
@@ -168,9 +169,9 @@ func main() {
 	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
 
 	cntxt := &daemon.Context{
-		PidFileName: "/tmp/kelvinly-server-pid",
+		PidFileName: "/tmp/main-server-pid",
 		PidFilePerm: 0644,
-		LogFileName: "/tmp/kelvinly-server-log",
+		LogFileName: "/tmp/main-server-log",
 		LogFilePerm: 0640,
 		WorkDir:     "/home/kelvin/main-server/",
 		Umask:       027,
