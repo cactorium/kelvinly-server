@@ -3,5 +3,5 @@
 SCRIPT=`realpath $0`
 SCRIPTPATH=`dirname $SCRIPT`
 BASENAME=`basename $SCRIPTPATH`
-echo $BASENAME
+echo "killing $BASENAME"
 kill `cat /tmp/$BASENAME-pid`
