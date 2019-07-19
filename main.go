@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -73,6 +74,7 @@ var (
 		quit — graceful shutdown
 		stop — fast shutdown
 		reload — reloading the configuration file`)
+	devmode = flag.Bool("dev_mode", false, "whether this server should run in developer mode or not")
 )
 
 const DEBUG = false
@@ -255,12 +257,53 @@ func readWebhookKey() []byte {
 	return b[:len(b)-1]
 }
 
+// copied from https://stackoverflow.com/questions/34724160/go-http-send-incoming-http-request-to-an-other-server-using-client-do
+func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *http.Request) {
+	proxyHost := "0.0.0.0" + ":" + strconv.Itoa(port)
+	return func(w http.ResponseWriter, req *http.Request) {
+		// we need to buffer the body if we want to read it here and send it
+		// in the request.
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// you can reassign the body if you need to parse it as multipart
+		req.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+		// create a new url from the raw RequestURI sent by the client
+		url := fmt.Sprintf("%s://%s%s", proxyScheme, proxyHost, req.RequestURI)
+
+		proxyReq, err := http.NewRequest(req.Method, url, bytes.NewReader(body))
+
+		// We may want to filter some headers, otherwise we could just use a shallow copy
+		// proxyReq.Header = req.Header
+		proxyReq.Header = make(http.Header)
+		for h, val := range req.Header {
+			proxyReq.Header[h] = val
+		}
+
+		resp, err := (&http.Client{}).Do(proxyReq)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// legacy code
+	}
+}
+
 func startServer(srv *http.Server) {
 	log.Print("installing handlers")
 
 	webhookKey := readWebhookKey()
 
 	serveMux := http.NewServeMux()
+	if !*devmode {
+		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8444, "https"))
+	}
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
@@ -318,7 +361,11 @@ func startServer(srv *http.Server) {
 		})
 	}
 
-	srv.Addr = ":8443"
+	if *devmode {
+		srv.Addr = ":8444"
+	} else {
+		srv.Addr = ":8443"
+	}
 	srv.Handler = Gzip(serveMux)
 	log.Print("starting server")
 	if !DEBUG {
@@ -333,6 +380,10 @@ func startServer(srv *http.Server) {
 func startRedirectServer(srv *http.Server) {
 	serveMux := http.NewServeMux()
 	// copied from https://gist.github.com/d-schmidt/587ceec34ce1334a5e60
+	if !*devmode {
+		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
+	}
+
 	serveMux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		target := "https://" + req.Host + req.URL.Path
 		if len(req.URL.RawQuery) > 0 {
@@ -341,7 +392,11 @@ func startRedirectServer(srv *http.Server) {
 		http.Redirect(w, req, target, http.StatusTemporaryRedirect)
 	})
 
-	srv.Addr = ":8080"
+	if *devmode {
+		srv.Addr = ":8081"
+	} else {
+		srv.Addr = ":8080"
+	}
 	srv.Handler = serveMux
 	log.Print("starting server")
 	log.Fatal(srv.ListenAndServe())
