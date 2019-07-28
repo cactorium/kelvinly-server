@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -327,7 +329,13 @@ func startServer(srv *http.Server) {
 
 	serveMux := http.NewServeMux()
 	if !*devmode {
-		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
+		//serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
+		url, err := url.Parse("http://localhost:8081")
+		if err != nil {
+			log.Fatalf("unable to parse reverse proxy path: %v", err)
+			return
+		}
+		serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
 	}
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
@@ -407,7 +415,14 @@ func startRedirectServer(srv *http.Server) {
 	serveMux := http.NewServeMux()
 	// copied from https://gist.github.com/d-schmidt/587ceec34ce1334a5e60
 	if !*devmode {
-		serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
+		//serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
+		url, err := url.Parse("http://localhost:8081")
+		if err != nil {
+			log.Fatalf("unable to parse reverse proxy path: %v", err)
+			return
+		}
+		serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
+
 	}
 
 	serveMux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
