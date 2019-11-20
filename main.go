@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -16,62 +15,16 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
 	"strings"
 	"syscall"
 
-	"compress/gzip"
-	"io"
 	"io/ioutil"
-	"sync"
 
 	"github.com/sevlyar/go-daemon"
 	gfm "github.com/shurcooL/github_flavored_markdown"
 	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
 )
-
-// code copied from https://gist.github.com/CJEnright/bc2d8b8dc0c1389a9feeddb110f822d7
-
-var gzPool = sync.Pool{
-	New: func() interface{} {
-		w := gzip.NewWriter(ioutil.Discard)
-		return w
-	},
-}
-
-type gzipResponseWriter struct {
-	io.Writer
-	http.ResponseWriter
-}
-
-func (w *gzipResponseWriter) WriteHeader(status int) {
-	w.Header().Del("Content-Length")
-	w.ResponseWriter.WriteHeader(status)
-}
-
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
-}
-
-func Gzip(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		w.Header().Set("Content-Encoding", "gzip")
-
-		gz := gzPool.Get().(*gzip.Writer)
-		defer gzPool.Put(gz)
-
-		gz.Reset(w)
-		defer gz.Close()
-
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, Writer: gz}, r)
-	})
-}
 
 var (
 	signal = flag.String("s", "", `send signal to the daemon
@@ -139,6 +92,7 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
 	w.Write([]byte(fmt.Sprintf(HTML_HEADER, string(title), r.Host)))
 	for _, b := range bs {
 		html := gfm.Markdown(b)
+		// find images in markdown, replace with device-responsive images
 		w.Write(html)
 	}
 	w.Write([]byte(HTML_FOOTER))
@@ -265,63 +219,6 @@ func readWebhookKey() []byte {
 	return b[:len(b)-1]
 }
 
-var transportNoTlsVerify = http.Transport{
-	TLSClientConfig: &tls.Config{
-		InsecureSkipVerify: true,
-	},
-}
-
-// copied from https://stackoverflow.com/questions/34724160/go-http-send-incoming-http-request-to-an-other-server-using-client-do
-func forwardRequest(port int, proxyScheme string) func(http.ResponseWriter, *http.Request) {
-	proxyHost := "0.0.0.0" + ":" + strconv.Itoa(port)
-	return func(w http.ResponseWriter, req *http.Request) {
-		// we need to buffer the body if we want to read it here and send it
-		// in the request.
-		body, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// you can reassign the body if you need to parse it as multipart
-		req.Body = ioutil.NopCloser(bytes.NewReader(body))
-
-		// create a new url from the raw RequestURI sent by the client
-		url := fmt.Sprintf("%s://%s%s", proxyScheme, proxyHost, req.RequestURI)
-		log.Print("request to " + req.RequestURI + " forwarded to " + url)
-
-		proxyReq, err := http.NewRequest(req.Method, url, bytes.NewReader(body))
-
-		// We may want to filter some headers, otherwise we could just use a shallow copy
-		// proxyReq.Header = req.Header
-		proxyReq.Header = make(http.Header)
-		for h, val := range req.Header {
-			proxyReq.Header[h] = val
-		}
-
-		client := &http.Client{}
-		if proxyScheme == "https" {
-			client = &http.Client{Transport: &transportNoTlsVerify}
-		}
-		resp, err := client.Do(proxyReq)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
-
-		respHeaders := w.Header()
-		for h, val := range resp.Header {
-			respHeaders[h] = val
-		}
-		w.WriteHeader(resp.StatusCode)
-		_, err = io.Copy(w, resp.Body)
-		if err != nil {
-			log.Print("encountered error while forwarding copy : " + err.Error())
-		}
-	}
-}
-
 func startServer(srv *http.Server) {
 	log.Print("installing handlers")
 
@@ -329,7 +226,6 @@ func startServer(srv *http.Server) {
 
 	serveMux := http.NewServeMux()
 	if !*devmode {
-		//serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
 		url, err := url.Parse("http://localhost:8081")
 		if err != nil {
 			log.Fatalf("unable to parse reverse proxy path: %v", err)
@@ -341,6 +237,11 @@ func startServer(srv *http.Server) {
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
+	/*
+		serveMux.HandleFunc("/thumbnail/", cache(func(w http.ResponseWriter, r *http.Request) {
+			// TODO get file prefix; must be png or jpeg
+		}))
+	*/
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 	if webhookKey != nil {
 		log.Print("web hook found")
@@ -415,7 +316,6 @@ func startRedirectServer(srv *http.Server) {
 	serveMux := http.NewServeMux()
 	// copied from https://gist.github.com/d-schmidt/587ceec34ce1334a5e60
 	if !*devmode {
-		//serveMux.HandleFunc("dev."+DOMAIN_NAME+"/", forwardRequest(8081, "http"))
 		url, err := url.Parse("http://localhost:8081")
 		if err != nil {
 			log.Fatalf("unable to parse reverse proxy path: %v", err)
