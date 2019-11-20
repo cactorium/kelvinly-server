@@ -25,6 +25,12 @@ type ResponseCollector struct {
 	Response
 }
 
+func NewResponseCollector() *ResponseCollector {
+	return &ResponseCollector{
+		Response{Code: 200, Headers: make(map[string][]string)},
+	}
+}
+
 func (rc *ResponseCollector) Header() http.Header {
 	return rc.Headers
 }
@@ -60,12 +66,14 @@ func Cache(h http.Handler) http.Handler {
 		if exists {
 			entry.r.WriteResponse(rw)
 		} else {
-			rc := ResponseCollector{}
+			rc := NewResponseCollector()
 			// copy request in case they modify it
 			req := *r
-			h.ServeHTTP(&rc, &req)
+			h.ServeHTTP(rc, &req)
 			resp := rc.CollectResponse()
-			c[r.URL.String()] = cacheEntry{resp}
+			if resp.Code == 200 {
+				c[r.URL.String()] = cacheEntry{resp}
+			}
 			resp.WriteResponse(rw)
 		}
 		// TODO bookkeeping for the cache here

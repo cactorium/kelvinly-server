@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image/jpeg"
 	"image/png"
+	"log"
 	"net/http"
 
 	"github.com/nfnt/resize"
@@ -11,9 +12,9 @@ import (
 
 func Resize(maxWidth uint, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rc := ResponseCollector{}
+		rc := NewResponseCollector()
 		req := *r
-		h.ServeHTTP(&rc, &req)
+		h.ServeHTTP(rc, &req)
 		imageResp := rc.CollectResponse()
 
 		if imageResp.Code != 200 {
@@ -21,7 +22,7 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 			return
 		}
 
-		typ, hasType := imageResp.Headers["content-type"]
+		typ, hasType := imageResp.Headers["Content-Type"]
 		if !hasType || len(typ) == 0 {
 			rw.WriteHeader(501)
 			rw.Write([]byte("could not determine content type of image"))
@@ -29,6 +30,7 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 		}
 
 		buf := bytes.NewBuffer(imageResp.Body)
+		log.Println("buf len: ", buf.Len())
 		switch typ[0] {
 		case "image/png":
 			image, err := png.Decode(buf)
@@ -50,18 +52,20 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 			image, err := jpeg.Decode(buf)
 			if err != nil {
 				rw.WriteHeader(501)
-				rw.Write([]byte("error while decoding png: " + err.Error()))
+				rw.Write([]byte("error while decoding jpeg: " + err.Error()))
 				return
 			}
-			resizedImage := resize.Thumbnail(maxWidth, 0, image, resize.Lanczos3)
+			log.Println("resizing ", r.URL.String(), "(", image.Bounds().Max.X, ") to ", maxWidth)
+			resizedImage := resize.Thumbnail(maxWidth, 100000, image, resize.Lanczos3)
 			resizedBuf := new(bytes.Buffer)
-			jpegOptions := jpeg.Options{Quality: 75}
+			jpegOptions := jpeg.Options{Quality: 99}
 			if encodeErr := jpeg.Encode(resizedBuf, resizedImage, &jpegOptions); encodeErr != nil {
 				rw.WriteHeader(501)
-				rw.Write([]byte("error while encoding png: " + err.Error()))
+				rw.Write([]byte("error while encoding jpeg: " + err.Error()))
 				return
 			}
-			rw.Header().Add("Content-Type", "image/png")
+			rw.Header().Add("Content-Type", "image/jpeg")
+			log.Println("resized size: ", resizedBuf.Len())
 			rw.Write(resizedBuf.Bytes())
 		case "text/html":
 			rw.WriteHeader(415)

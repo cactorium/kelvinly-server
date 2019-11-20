@@ -34,9 +34,8 @@ var (
 	devmode = flag.Bool("dev_mode", false, "whether this server should run in developer mode or not")
 )
 
-const DEBUG = false
+const DEBUG = true
 
-const HOME_DIR = "/home/kelvin/"
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
 const HTML_HEADER = `<!doctype html5>
@@ -130,12 +129,16 @@ func main() {
 	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
 
 	execName := path.Base(os.Args[0])
+	cwd, cwdErr := os.Getwd()
+	if cwdErr != nil {
+		log.Fatalln("unable to get cwd:", cwdErr)
+	}
 	cntxt := &daemon.Context{
 		PidFileName: "/tmp/" + execName + "-pid",
 		PidFilePerm: 0644,
 		LogFileName: "/tmp/" + execName + "-log",
 		LogFilePerm: 0640,
-		WorkDir:     HOME_DIR + execName + "/",
+		WorkDir:     cwd + "/",
 		Umask:       027,
 	}
 	if DEBUG {
@@ -237,11 +240,7 @@ func startServer(srv *http.Server) {
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
-	/*
-		serveMux.HandleFunc("/thumbnail/", cache(func(w http.ResponseWriter, r *http.Request) {
-			// TODO get file prefix; must be png or jpeg
-		}))
-	*/
+	serveMux.Handle("/thumbnail/", Cache(Resize(1024, http.StripPrefix("/thumbnail", http.FileServer(http.Dir("static/"))))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 	if webhookKey != nil {
 		log.Print("web hook found")
@@ -302,7 +301,7 @@ func startServer(srv *http.Server) {
 		srv.Addr = ":8443"
 		srv.Handler = Gzip(serveMux)
 	}
-	log.Print("starting server")
+	log.Print("starting server at " + srv.Addr)
 	if !DEBUG && !*devmode {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
 			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
