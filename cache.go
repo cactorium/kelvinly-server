@@ -4,50 +4,6 @@ import (
 	"net/http"
 )
 
-type Response struct {
-	Code    int
-	Headers map[string][]string
-	Body    []byte
-}
-
-func (r Response) WriteResponse(rw http.ResponseWriter) {
-	for k, vs := range r.Headers {
-		for _, v := range vs {
-			rw.Header().Add(k, v)
-		}
-	}
-	rw.WriteHeader(r.Code)
-	rw.Write(r.Body)
-}
-
-// implements ResponseWriter to collect HTTP responses
-type ResponseCollector struct {
-	Response
-}
-
-func NewResponseCollector() *ResponseCollector {
-	return &ResponseCollector{
-		Response{Code: 200, Headers: make(map[string][]string)},
-	}
-}
-
-func (rc *ResponseCollector) Header() http.Header {
-	return rc.Headers
-}
-
-func (rc *ResponseCollector) Write(bs []byte) (int, error) {
-	rc.Body = append(rc.Body, bs...)
-	return len(bs), nil
-}
-
-func (rc *ResponseCollector) WriteHeader(code int) {
-	rc.Code = code
-}
-
-func (rc *ResponseCollector) CollectResponse() Response {
-	return rc.Response
-}
-
 type cacheEntry struct {
 	r Response
 }
@@ -66,10 +22,10 @@ func Cache(h http.Handler) http.Handler {
 		if exists {
 			entry.r.WriteResponse(rw)
 		} else {
-			rc := NewResponseCollector()
+			rc := ResponseCollector{}
 			// copy request in case they modify it
 			req := *r
-			h.ServeHTTP(rc, &req)
+			h.ServeHTTP(&rc, &req)
 			resp := rc.CollectResponse()
 			if resp.Code == 200 {
 				c[r.URL.String()] = cacheEntry{resp}

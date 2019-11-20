@@ -12,9 +12,9 @@ import (
 
 func Resize(maxWidth uint, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rc := NewResponseCollector()
+		rc := ResponseCollector{}
 		req := *r
-		h.ServeHTTP(rc, &req)
+		h.ServeHTTP(&rc, &req)
 		imageResp := rc.CollectResponse()
 
 		if imageResp.Code != 200 {
