@@ -120,7 +120,7 @@ func (r *renderer) Image(out *bytes.Buffer, link []byte, title []byte, alt []byt
 	writeSource := func() {
 		out.WriteString("<source srcset=\"")
 		attrEscape(out, link)
-		out.WriteString("\" media=\"(min-width: 1024px)\">")
+		out.WriteString("\" media=\"(min-width: 800px)\">")
 	}
 	// link to outside of this website
 	if bytes.HasPrefix(link, []byte("http")) {
