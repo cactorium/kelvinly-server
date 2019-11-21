@@ -39,9 +39,10 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 				rw.Write([]byte("error while decoding png: " + err.Error()))
 				return
 			}
-			resizedImage := resize.Thumbnail(maxWidth, 0, image, resize.Lanczos3)
+			resizedImage := resize.Thumbnail(2*maxWidth, 100000, image, resize.NearestNeighbor)
 			resizedBuf := new(bytes.Buffer)
-			if encodeErr := png.Encode(resizedBuf, resizedImage); encodeErr != nil {
+			encoder := png.Encoder{CompressionLevel: png.BestCompression}
+			if encodeErr := encoder.Encode(resizedBuf, resizedImage); encodeErr != nil {
 				rw.WriteHeader(501)
 				rw.Write([]byte("error while encoding png: " + err.Error()))
 				return

@@ -96,7 +96,6 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
 			pathDir = pathDir[:lastSlash]
 		}
 		// Markdown uses the path to generate the correct paths for resized images
-		log.Print(paths[i], "->", pathDir)
 		html := Markdown(b, pathDir)
 		w.Write(html)
 	}
