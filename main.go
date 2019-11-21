@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 
 	"github.com/sevlyar/go-daemon"
-	gfm "github.com/shurcooL/github_flavored_markdown"
 	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
 )
@@ -34,7 +33,7 @@ var (
 	devmode = flag.Bool("dev_mode", false, "whether this server should run in developer mode or not")
 )
 
-const DEBUG = true
+const DEBUG = false
 
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
@@ -42,6 +41,7 @@ const HTML_HEADER = `<!doctype html5>
 <html>
 <head>
   <meta charset=utf-8>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>%s | %s</title>
 	<link href=/gfm/gfm.css media=all rel=stylesheet type=text/css></link>
 	<link href=/main.css media=all rel=stylesheet type=text/css></link>
@@ -89,9 +89,15 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
 		}
 	}
 	w.Write([]byte(fmt.Sprintf(HTML_HEADER, string(title), r.Host)))
-	for _, b := range bs {
-		html := gfm.Markdown(b)
-		// find images in markdown, replace with device-responsive images
+	for i, b := range bs {
+		pathDir := paths[i][len("static/"):]
+		lastSlash := strings.LastIndex(pathDir, "/")
+		if lastSlash != -1 {
+			pathDir = pathDir[:lastSlash]
+		}
+		// Markdown uses the path to generate the correct paths for resized images
+		log.Print(paths[i], "->", pathDir)
+		html := Markdown(b, pathDir)
 		w.Write(html)
 	}
 	w.Write([]byte(HTML_FOOTER))
@@ -240,7 +246,7 @@ func startServer(srv *http.Server) {
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
 	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
-	serveMux.Handle("/thumbnail/", Cache(Resize(1024, http.StripPrefix("/thumbnail", http.FileServer(http.Dir("static/"))))))
+	serveMux.Handle("/resize/", Cache(Resize(640, http.StripPrefix("/resize", http.FileServer(http.Dir("static/"))))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 	if webhookKey != nil {
 		log.Print("web hook found")
