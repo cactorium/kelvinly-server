@@ -39,7 +39,7 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 				rw.Write([]byte("error while decoding png: " + err.Error()))
 				return
 			}
-			resizedImage := resize.Thumbnail(2*maxWidth, 100000, image, resize.NearestNeighbor)
+			resizedImage := resize.Thumbnail(maxWidth, 100000, image, resize.NearestNeighbor)
 			resizedBuf := new(bytes.Buffer)
 			encoder := png.Encoder{CompressionLevel: png.BestCompression}
 			if encodeErr := encoder.Encode(resizedBuf, resizedImage); encodeErr != nil {
@@ -59,7 +59,7 @@ func Resize(maxWidth uint, h http.Handler) http.Handler {
 			log.Println("resizing ", r.URL.String(), "(", image.Bounds().Max.X, ") to ", maxWidth)
 			resizedImage := resize.Thumbnail(maxWidth, 100000, image, resize.Lanczos3)
 			resizedBuf := new(bytes.Buffer)
-			jpegOptions := jpeg.Options{Quality: 99}
+			jpegOptions := jpeg.Options{Quality: 75}
 			if encodeErr := jpeg.Encode(resizedBuf, resizedImage, &jpegOptions); encodeErr != nil {
 				rw.WriteHeader(501)
 				rw.Write([]byte("error while encoding jpeg: " + err.Error()))
