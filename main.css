@@ -1,3 +1,11 @@
+html {
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
 body {
   margin: 0;
   background-color: rgb(240, 240, 240);
@@ -9,6 +17,7 @@ article {
   max-width: 1012px;
   margin-right: auto;
   margin-left: auto;
+  padding-bottom: 20em;
 }
 
 nav, footer {
