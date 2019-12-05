@@ -55,7 +55,7 @@ const HTML_HEADER = `<!doctype html5>
 	<div class="nav-item"><a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a></div>
 </div>
 </nav>
-<article class="markdown-body entry-content" style="padding:2em;">
+<article class="markdown-body entry-content" style="padding:4em;">
 `
 
 const HTML_FOOTER = `
