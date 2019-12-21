@@ -14,23 +14,13 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
+	"os/signal"
 	"strings"
-	"syscall"
 
 	"io/ioutil"
 
-	"github.com/sevlyar/go-daemon"
 	"github.com/shurcooL/github_flavored_markdown/gfmstyle"
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
-)
-
-var (
-	signal = flag.String("s", "", `send signal to the daemon
-		quit — graceful shutdown
-		stop — fast shutdown
-		reload — reloading the configuration file`)
-	devmode = flag.Bool("dev_mode", false, "whether this server should run in developer mode or not")
 )
 
 const DEBUG = false
@@ -123,89 +113,31 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 var (
-	shutdown       chan struct{} = make(chan struct{})
 	serverShutdown chan struct{} = make(chan struct{})
 )
 
 func main() {
 	flag.Parse()
-	daemon.AddCommand(daemon.StringFlag(signal, "quit"), syscall.SIGQUIT, termHandler)
-	daemon.AddCommand(daemon.StringFlag(signal, "stop"), syscall.SIGTERM, termHandler)
-	daemon.AddCommand(daemon.StringFlag(signal, "reload"), syscall.SIGHUP, reloadHandler)
-
-	execName := path.Base(os.Args[0])
-	cwd, cwdErr := os.Getwd()
-	if cwdErr != nil {
-		log.Fatalln("unable to get cwd:", cwdErr)
-	}
-	cntxt := &daemon.Context{
-		PidFileName: "/tmp/" + execName + "-pid",
-		PidFilePerm: 0644,
-		LogFileName: "/tmp/" + execName + "-log",
-		LogFilePerm: 0640,
-		WorkDir:     cwd + "/",
-		Umask:       027,
-	}
-	if DEBUG {
-		cntxt.WorkDir = "."
-	}
-
-	// TODO: figure out the daemonizing stuff
-
-	if len(daemon.ActiveFlags()) > 0 {
-		d, err := cntxt.Search()
-		if err != nil {
-			log.Fatalln("Unable to send signal to daemon:", err)
-		}
-		daemon.SendCommands(d)
-		return
-	}
-
-	d, err := cntxt.Reborn()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if d != nil {
-		return
-	}
-	defer cntxt.Release()
 
 	var redirect http.Server
 	var srv http.Server
 
-	if !*devmode {
-		go startRedirectServer(&redirect)
-	}
+	go startRedirectServer(&redirect)
 	go startServer(&srv)
 
-	go func() {
-		<-shutdown
-		log.Println("shutting down server...")
-		if err := srv.Shutdown(context.Background()); err != nil {
-			log.Printf("server shutdown error: %v\n", err)
-		}
-		if err = redirect.Shutdown(context.Background()); err != nil {
-			log.Printf("redirect shutdown error: %v\n", err)
-		}
-	}()
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt)
 
-	err = daemon.ServeSignals()
-	if err != nil {
-		log.Println("Error: ", err)
+	<-shutdown
+	log.Println("shutting down server...")
+	if err := srv.Shutdown(context.Background()); err != nil {
+		log.Printf("server shutdown error: %v\n", err)
+	}
+	if err := redirect.Shutdown(context.Background()); err != nil {
+		log.Printf("redirect shutdown error: %v\n", err)
 	}
 
 	log.Println("server terminated")
-}
-
-func termHandler(sig os.Signal) error {
-	log.Printf("sending shutdown signal...")
-	close(shutdown)
-	return daemon.ErrStop
-}
-
-func reloadHandler(sig os.Signal) error {
-	log.Printf("[WARN] reloading not supported yet")
-	return nil
 }
 
 func readWebhookKey() []byte {
@@ -233,14 +165,20 @@ func startServer(srv *http.Server) {
 	webhookKey := readWebhookKey()
 
 	serveMux := http.NewServeMux()
-	if !*devmode {
-		url, err := url.Parse("http://localhost:8081")
-		if err != nil {
-			log.Fatalf("unable to parse reverse proxy path: %v", err)
-			return
-		}
-		serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
+	url, err := url.Parse("http://localhost:8081")
+	if err != nil {
+		log.Fatalf("unable to parse reverse proxy path: %v", err)
+		return
 	}
+	serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
+
+	gogsUrl, err := url.Parse("http://localhost:7000")
+	if err != nil {
+		log.Fatalf("unable to parse reverse proxy path: %v", err)
+		return
+	}
+	serveMux.Handle("git."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(gogsUrl))
+
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
@@ -299,15 +237,10 @@ func startServer(srv *http.Server) {
 		})
 	}
 
-	if *devmode {
-		srv.Addr = ":8081"
-		srv.Handler = serveMux
-	} else {
-		srv.Addr = ":8443"
-		srv.Handler = Gzip(serveMux)
-	}
+	srv.Addr = ":8443"
+	srv.Handler = Gzip(serveMux)
 	log.Print("starting server at " + srv.Addr)
-	if !DEBUG && !*devmode {
+	if !DEBUG {
 		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
 			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
 	} else {
@@ -319,15 +252,12 @@ func startServer(srv *http.Server) {
 func startRedirectServer(srv *http.Server) {
 	serveMux := http.NewServeMux()
 	// copied from https://gist.github.com/d-schmidt/587ceec34ce1334a5e60
-	if !*devmode {
-		url, err := url.Parse("http://localhost:8081")
-		if err != nil {
-			log.Fatalf("unable to parse reverse proxy path: %v", err)
-			return
-		}
-		serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
-
+	url, err := url.Parse("http://localhost:8081")
+	if err != nil {
+		log.Fatalf("unable to parse reverse proxy path: %v", err)
+		return
 	}
+	serveMux.Handle("dev."+DOMAIN_NAME+"/", httputil.NewSingleHostReverseProxy(url))
 
 	serveMux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		target := "https://" + req.Host + req.URL.Path
@@ -337,11 +267,7 @@ func startRedirectServer(srv *http.Server) {
 		http.Redirect(w, req, target, http.StatusTemporaryRedirect)
 	})
 
-	if *devmode {
-		srv.Addr = ":8081"
-	} else {
-		srv.Addr = ":8080"
-	}
+	srv.Addr = ":8080"
 	srv.Handler = serveMux
 	log.Print("starting server")
 	log.Fatal(srv.ListenAndServe())
