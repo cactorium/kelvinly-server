@@ -41,6 +41,7 @@ const HTML_HEADER = `<!doctype html5>
 <div class="nav-wrapper">
 	<div class="nav-item"><a href="/">Home</a></div>
 	<div class="nav-item"><a href="/builds.md">Projects</a></div>
+	<div class="nav-item"><a href="https://git.threefortiethofonehamster.com/">Code</a></div>
 	<div class="nav-item"><a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a></div>
 </div>
 </nav>
