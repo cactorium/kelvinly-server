@@ -40,8 +40,7 @@ const HTML_HEADER = `<!doctype html5>
 <nav>
 <div class="nav-wrapper">
 	<div class="nav-item"><a href="/">Home</a></div>
-	<div class="nav-item"><a href="/projects.md">Projects</a></div>
-	<div class="nav-item"><a href="/builds.md">Builds</a></div>
+	<div class="nav-item"><a href="/builds.md">Projects</a></div>
 	<div class="nav-item"><a href="/resume/resume-KelvinLy-hardware.pdf">Resume</a></div>
 </div>
 </nav>
@@ -95,7 +94,7 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		if r.URL.Path == "/" {
-			serveMarkdown(w, r, "static/intro.md", "static/projects.md", "static/builds.md")
+			serveMarkdown(w, r, "static/intro.md", "static/builds.md")
 		} else if strings.HasSuffix(r.URL.Path, ".md") {
 			if strings.Contains(r.URL.Path, "..") {
 				w.WriteHeader(403)
