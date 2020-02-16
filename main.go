@@ -182,7 +182,6 @@ func startServer(srv *http.Server) {
 	serveMux.HandleFunc("/", rootHandler)
 	//serveMux.Handle("/certbot/", http.StripPrefix("/certbot/", http.FileServer(http.Dir("./certbot-tmp"))))
 	serveMux.Handle("/gfm/", http.StripPrefix("/gfm", http.FileServer(gfmstyle.Assets)))
-	serveMux.Handle("/resume/", http.StripPrefix("/resume", http.FileServer(http.Dir("resume/"))))
 	serveMux.Handle("/resize/", Cache(Resize(640, http.StripPrefix("/resize", http.FileServer(http.Dir("static/"))))))
 	serveMux.HandleFunc("/main.css", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "main.css") })
 	if webhookKey != nil {
@@ -229,9 +228,13 @@ func startServer(srv *http.Server) {
 			}
 			// TODO parse payload
 
-			pullCmd := exec.Command("git", "pull")
+			pullCmd := exec.Command("git", "pull", "--recurse-submodules")
 			pullCmd.Dir = "./static/"
 			_ = pullCmd.Run()
+
+			updateCmd := exec.Command("git", "submodule", "update", "--remote")
+			updateCmd.Dir = "./static/"
+			_ = updateCmd.Run()
 
 			w.Write([]byte("success"))
 		})
