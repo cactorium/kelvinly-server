@@ -23,7 +23,7 @@ import (
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
-const DEBUG = false
+const DEBUG = true
 
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
@@ -95,7 +95,7 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request, paths ...string) {
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		if r.URL.Path == "/" {
-			serveMarkdown(w, r, "static/intro.md", "static/builds.md")
+			serveMarkdown(w, r, "static/intro.md")
 		} else if strings.HasSuffix(r.URL.Path, ".md") {
 			if strings.Contains(r.URL.Path, "..") {
 				w.WriteHeader(403)

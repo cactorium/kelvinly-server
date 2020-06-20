@@ -21,8 +21,8 @@ article {
   padding-bottom: 4em;
 }
 
-nav, footer {
-  background-color: rgb(32, 164, 32);
+nav {
+  background-color: rgb(32, 32, 32);
   margin-right: auto;
   margin-left: auto;
   color: rgb(180, 220, 180);
@@ -38,6 +38,9 @@ footer {
 
 a {
   text-decoration: none;
+}
+
+nav a {
   color: rgb(220, 220, 250);
 }
 
