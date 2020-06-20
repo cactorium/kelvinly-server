@@ -1,8 +1,7 @@
 #!/bin/bash
 
-sudo add-apt-repository ppa:gophers/archive
 sudo apt-get update
-sudo apt-get -y install golang-1.10-go
+sudo apt-get -y install golang
 sudo apt-get -y install iptables-persistent
 
 mkdir -p ~/go
@@ -13,12 +12,14 @@ echo "export GOPATH=~/go" >> ~/.bashrc
 sudo cp rules.v4 /etc/iptables/rules.v4
 sudo service netfilter-persistent reload
 
-sudo cp kelvinly-server.service /etc/systemd/system
+sudo cp main-server.service /etc/systemd/system
+sudo cp gogs.service /etc/systemd/system
 
 source ~/.bashrc
-go get -u gopkg.in/russross/blackfriday.v2
+#go get -u gopkg.in/russross/blackfriday.v2
 go get -u github.com/shurcooL/github_flavored_markdown
-go get -u github.com/sevlyar/go-daemon
+#go get -u github.com/sevlyar/go-daemon
 
-sudo apt-get install certbot -t stretch-backports
-mkdir -p certbot-tmp
+sudo apt-get install certbot python3-certbot-dns-google
+
+echo "cerbot still needs setup, and the servers need to be enabled!"

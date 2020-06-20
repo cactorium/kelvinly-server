@@ -244,8 +244,8 @@ func startServer(srv *http.Server) {
 	srv.Handler = Gzip(serveMux)
 	log.Print("starting server at " + srv.Addr)
 	if !DEBUG {
-		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"-0001/fullchain.pem",
-			"/etc/letsencrypt/live/"+DOMAIN_NAME+"-0001/privkey.pem"))
+		log.Fatal(srv.ListenAndServeTLS("/etc/letsencrypt/live/"+DOMAIN_NAME+"/fullchain.pem",
+			"/etc/letsencrypt/live/"+DOMAIN_NAME+"/privkey.pem"))
 	} else {
 		log.Fatal(srv.ListenAndServe())
 	}
