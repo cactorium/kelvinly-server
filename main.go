@@ -23,7 +23,7 @@ import (
 	//blackfriday "gopkg.in/russross/blackfriday.v2"
 )
 
-const DEBUG = true
+const DEBUG = false
 
 const DOMAIN_NAME = "threefortiethofonehamster.com"
 
